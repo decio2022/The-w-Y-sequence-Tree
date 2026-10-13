@@ -12,7 +12,7 @@ let modInfo = {
 
 // Set your version in num and name
 let VERSION = {
-	num: "1.1",
+	num: "1.2",
 	name: "w-Y sequence",
 }
 
@@ -23,7 +23,11 @@ let changelog = `<h1>Changelog:</h1><br>
 		- Each layer has 3 upgrades and multiplies point gain tetrationally more than the previous one.<br>
 	<h3>v1.1</h3><br>
 		- Added 10 more upgrades per layer (13 total per layer, 130 in all).<br>
-		- Added passive generation: a layer passively gains 100% of its reset gain per second once its own points reach e10 (1e10), or 500% per second with its Y-passive upgrade.`
+		- Added passive generation: a layer passively gains 100% of its reset gain per second once its own points reach e10 (1e10), or 500% per second with its Y-passive upgrade.<br>
+	<h3>v1.2</h3><br>
+		- Added 87 extremely overpowered upgrades per layer: now 100 upgrades per layer (1,000 in all).<br>
+		- Added a Dev side layer: type a value for player.points, jump to landmarks, and see the w-Y sequence, get_time and estimated time to each sequence.<br>
+		- Added a Notations side layer showing your points in the other notations from conv.js (BMS, DBMS, PMS, AMS, 0Y, Vulcaniz, cOCF, EcOCF).`
 
 let winText = `Congratulations! You reached F10 (10^^10) points, reset for Y10, and your points display reached w-Y 1,3. You have beaten this game, but for now...`
 
@@ -54,6 +58,9 @@ function getPointGen() {
 		for (let id of WY_LAYER_IDS) {
 			if (player[id] && player[id].unlocked && tmp[id] && tmp[id].effect)
 				gain = gain.times(tmp[id].effect)
+			// Extremely overpowered generated upgrades (kinds 0, 3, 4)
+			if (player[id] && typeof wyOpPointMult !== "undefined")
+				gain = gain.times(wyOpPointMult(id))
 			if (typeof hasUpgrade !== "undefined" && player[id]) {
 				if (hasUpgrade(id, 13)) gain = gain.times(100)
 				if (hasUpgrade(id, 22)) gain = gain.times(1000)
