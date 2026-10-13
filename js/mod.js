@@ -12,16 +12,17 @@ let modInfo = {
 
 // Set your version in num and name
 let VERSION = {
-	num: "0.0",
-	name: "Literally nothing",
+	num: "1.0",
+	name: "w-Y sequence",
 }
 
 let changelog = `<h1>Changelog:</h1><br>
-	<h3>v0.0</h3><br>
-		- Added things.<br>
-		- Added stuff.`
+	<h3>v1.0</h3><br>
+		- Added 10 w-Y layers: Layer 1 unlocks at 10 points, Layer 10 at F10 (10^^10) points.<br>
+		- The points display now shows the w-Y sequence: it starts at 1,1 and reaches 1,3 at F10 points.<br>
+		- Each layer has 3 upgrades and multiplies point gain tetrationally more than the previous one.`
 
-let winText = `Congratulations! You have reached the end and beaten this game, but for now...`
+let winText = `Congratulations! You reached F10 (10^^10) points, reset for Y10, and your points display reached w-Y 1,3. You have beaten this game, but for now...`
 
 // If you add new functions anywhere inside of a layer, and those functions have an effect when called, add them here.
 // (The ones here are examples, all official functions are already taken care of)
@@ -42,6 +43,16 @@ function getPointGen() {
 		return new Decimal(0)
 
 	let gain = new Decimal(1)
+	// Every unlocked w-Y layer multiplies point gain by its effect
+	// (and by another x100 if its "Y-limit" upgrade is bought).
+	if (typeof WY_LAYER_IDS !== "undefined") {
+		for (let id of WY_LAYER_IDS) {
+			if (player[id] && player[id].unlocked && tmp[id] && tmp[id].effect)
+				gain = gain.times(tmp[id].effect)
+			if (typeof hasUpgrade !== "undefined" && player[id] && hasUpgrade(id, 13))
+				gain = gain.times(100)
+		}
+	}
 	return gain
 }
 
@@ -110,17 +121,94 @@ function num_time(t) {
     }
 }
 
+
+// ============================================================
+//  Points -> w-Y sequence display
+//
+//  The display starts at "1,1" and ends at "1,3" (the limit of BMS
+//  in the w-Y sequence, Lim_BMS_in_Yseq in conv.js) when the points
+//  reach F10 = 10^^10, which is also the Layer 10 requirement.
+//
+//  Formula (built on get_time / get_time_inv above):
+//    1. Measure the points on a tetration scale with the
+//       super-logarithm:  slog(10) = 1,  slog(F10) = slog(10^^10) = 10.
+//    2. Stretch that evenly onto the range get_time can output:
+//           value = 2 + 2 * (slog(points) - 1) / 9        (2 ... 4)
+//       so value = 2 at <= 10 points and value = 4 at F10.
+//    3. Turn the value into a "time" with the inverse function,
+//       then read it back with get_time (the round-trip is exact):
+//           t      = get_time_inv(value)   // = get_time_inv(4) at F10
+//           result = get_time(t)           // reaches 4 at F10
+//    4. Feed the result into the supplied num_to_lngi / ntl, which
+//       interpolate in the w-Y sequence via Y_Sequence.fs:
+//           num_to_lngi(2) = "1,1"   and   num_to_lngi(4) = "1,3"
+// ============================================================
+
+function wyTimeFromPoints(points) {
+    // Tetration height of the points: 1 at 10 points, 10 at F10.
+    let s = new Decimal(1)
+    if (points.gt(10)) s = points.slog(10)
+    let frac = s.sub(1).div(9) // 0 at 10 points, 1 at F10
+    if (frac.lt(0)) frac = new Decimal(0)
+    if (frac.gt(1)) frac = new Decimal(1)
+    let value = 2 + 2 * frac.toNumber() // 2 ... 4
+    return get_time_inv(value)
+}
+
+let _wyCacheKey = null
+let _wyCacheSeq = "1,1"
+
+function wySequenceFromPoints(points) {
+    let t = wyTimeFromPoints(points)
+    let result = get_time(t) // 2 ... 4, and exactly 4 at F10 points
+    // num_to_lngi (via ntl + Y_Sequence.fs) is comparatively expensive
+    // and the displayed sequence only changes slowly, so cache it on
+    // the (quantised) result of get_time.
+    let key = result.toFixed(4)
+    if (key !== _wyCacheKey) {
+        _wyCacheKey = key
+        try { _wyCacheSeq = num_to_lngi(result)[0] } catch (e) { /* keep last sequence */ }
+    }
+    return _wyCacheSeq
+}
+
+// Used by the points header (overlay-head in systemComponents.js)
+function formatWyPoints(points) {
+    return wySequenceFromPoints(points)
+}
+
+function wyProgressText() {
+    let result = get_time(wyTimeFromPoints(player.points))
+    let pct = Math.max(0, Math.min(100, (result - 2) / 2 * 100))
+    return "w-Y progress: get_time = " + result.toFixed(4) + " / 4 (" + pct.toFixed(2) +
+        "%) &mdash; reach 4 (w-Y 1,3) at F10 = 10^^10 points"
+}
+
+function wyNextLayerText() {
+    if (typeof WY_LAYER_IDS === "undefined") return ""
+    for (let i = 0; i < WY_LAYER_IDS.length; i++) {
+        let id = WY_LAYER_IDS[i]
+        if (!player[id] || !player[id].unlocked)
+            return "Next layer: Y" + (i + 1) + " unlocks at " + format(wyRequirement(i)) + " points (10^^" + (i + 1) + ")"
+    }
+    return "All 10 w-Y layers unlocked!"
+}
+
 // You can add non-layer related variables that should to into "player" and be saved here, along with default values
 function addedPlayerData() { return {
 }}
 
 // Display extra things at the top of the page
 var displayThings = [
+    function() { return "(" + format(player.points) + " points in ordinary notation)" },
+    wyProgressText,
+    wyNextLayerText,
 ]
 
-// Determines when the game "ends"
+// Determines when the game "ends": reset at F10 (10^^10) points to
+// unlock the last (10th) layer, i.e. have any Y10 points.
 function isEndgame() {
-	return player.points.gte(new Decimal("10^^10"))
+	return !!(player.y10 && player.y10.points && player.y10.points.gt(0))
 }
 
 
