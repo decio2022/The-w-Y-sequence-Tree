@@ -12,7 +12,7 @@ let modInfo = {
 
 // Set your version in num and name
 let VERSION = {
-	num: "1.3",
+	num: "1.4",
 	name: "w-Y sequence",
 }
 
@@ -29,7 +29,10 @@ let changelog = `<h1>Changelog:</h1><br>
 		- Added a Dev side layer: type a value for player.points, jump to landmarks, and see the w-Y sequence, get_time and estimated time to each sequence.<br>
 		- Added a Notations side layer showing your points in the other notations from conv.js (BMS, DBMS, PMS, AMS, 0Y, Vulcaniz, cOCF, EcOCF).<br>
 	<h3>v1.3</h3><br>
-		- Added a milestone to every layer: at ee10 of that layer's points it auto-buys every upgrade in its own layer.`
+		- Added a milestone to every layer: at ee10 of that layer's points it auto-buys every upgrade in its own layer.<br>
+	<h3>v1.4</h3><br>
+		- Added 9,900 tetrational upgrades per layer: now 10,000 upgrades per layer (100,000 in all). Each multiplies point gain by 10^^(1 + log10(n/100)), so they get tetrationally stronger while the tetration height's growth slows.<br>
+		- Revamped the upgrades display: upgrades are now shown 100 per page, with page navigation.`
 
 let winText = `Congratulations! You reached F10 (10^^10) points, reset for Y10, and your points display reached w-Y 1,3. You have beaten this game, but for now...`
 
@@ -63,6 +66,9 @@ function getPointGen() {
 			// Extremely overpowered generated upgrades (kinds 0, 3, 4)
 			if (player[id] && typeof wyOpPointMult !== "undefined")
 				gain = gain.times(wyOpPointMult(id))
+			// Tetrational upgrades n=101..10000 (aggregated, cached)
+			if (player[id] && player[id].upgrades && typeof wyMegaPointMult !== "undefined")
+				gain = gain.times(wyMegaPointMult(id))
 			if (typeof hasUpgrade !== "undefined" && player[id]) {
 				if (hasUpgrade(id, 13)) gain = gain.times(100)
 				if (hasUpgrade(id, 22)) gain = gain.times(1000)

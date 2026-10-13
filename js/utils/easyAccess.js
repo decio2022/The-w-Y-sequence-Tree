@@ -1,5 +1,21 @@
+// With 10,000 upgrades per layer, Array.includes() inside hasUpgrade
+// (called constantly by effects, autobuy and the upgrade buttons)
+// would be O(n) per call. Cache a Set of each layer's bought upgrades
+// instead; the bought array only grows by appends between resets, so
+// the cache is extended incrementally and rebuilt when it changes.
+var _hasUpgradeSetCache = {}
 function hasUpgrade(layer, id) {
-	return ((player[layer].upgrades.includes(toNumber(id)) || player[layer].upgrades.includes(id.toString())) && !tmp[layer].deactivated)
+	let ups = player[layer].upgrades
+	let c = _hasUpgradeSetCache[layer]
+	if (!c || c.arr !== ups || ups.length < c.len) {
+		c = _hasUpgradeSetCache[layer] = { arr: ups, len: 0, set: new Set() }
+	}
+	while (c.len < ups.length) {
+		c.set.add(toNumber(ups[c.len]))
+		c.set.add(ups[c.len].toString())
+		c.len++
+	}
+	return (c.set.has(toNumber(id)) || c.set.has(id.toString())) && !tmp[layer].deactivated
 }
 
 function hasMilestone(layer, id) {

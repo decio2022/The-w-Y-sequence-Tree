@@ -156,13 +156,56 @@ function loadVue() {
 
 	Vue.component('upgrades', {
 		props: ['layer', 'data'],
+		data() { return { page: 0 } },
+		computed: {
+			// All numeric upgrade ids of this layer, in order. Only used
+			// by the paginated display (10,000 upgrades cannot be drawn
+			// at once), 100 upgrades per page.
+			allIds() {
+				return Object.keys(layers[this.layer].upgrades).filter(k => !isNaN(k)).map(Number).sort((a, b) => a - b)
+			},
+			pageCount() { return Math.max(1, Math.ceil(this.allIds.length / 100)) },
+			currentPage() { return Math.min(this.page, this.pageCount - 1) },
+			pageIds() { return this.allIds.slice(this.currentPage * 100, this.currentPage * 100 + 100) },
+		},
+		methods: {
+			setPage(p) { this.page = Math.max(0, Math.min(p, this.pageCount - 1)) },
+		},
 		template: `
 		<div v-if="tmp[layer].upgrades" class="upgTable">
-			<div v-for="row in (data === undefined ? tmp[layer].upgrades.rows : data)" class="upgRow">
-				<div v-for="col in tmp[layer].upgrades.cols"><div v-if="tmp[layer].upgrades[row*10+col]!== undefined && tmp[layer].upgrades[row*10+col].unlocked" class="upgAlign">
-					<upgrade :layer = "layer" :data = "row*10+col" v-bind:style="tmp[layer].componentStyles.upgrade"></upgrade>
-				</div></div>
-			</div>
+			<template v-if="data !== undefined">
+				<div v-for="row in data" class="upgRow">
+					<div v-for="col in tmp[layer].upgrades.cols"><div v-if="tmp[layer].upgrades[row*10+col]!== undefined && tmp[layer].upgrades[row*10+col].unlocked" class="upgAlign">
+						<upgrade :layer = "layer" :data = "row*10+col" v-bind:style="tmp[layer].componentStyles.upgrade"></upgrade>
+					</div></div>
+				</div>
+			</template>
+			<template v-else>
+				<div>
+					<button class="upg" style="min-width: 40px" v-on:click="setPage(0)">|&lt;</button>
+					<button class="upg" style="min-width: 40px" v-on:click="setPage(currentPage - 10)">-10</button>
+					<button class="upg" style="min-width: 40px" v-on:click="setPage(currentPage - 1)">&lt;</button>
+					<span> Page {{currentPage + 1}} / {{pageCount}} &mdash; upgrades {{currentPage * 100 + 1}}&ndash;{{Math.min(currentPage * 100 + 100, allIds.length)}} of {{allIds.length}} (100 per page) </span>
+					<button class="upg" style="min-width: 40px" v-on:click="setPage(currentPage + 1)">&gt;</button>
+					<button class="upg" style="min-width: 40px" v-on:click="setPage(currentPage + 10)">+10</button>
+					<button class="upg" style="min-width: 40px" v-on:click="setPage(pageCount - 1)">&gt;|</button>
+				</div>
+				<br>
+				<div style="display: flex; flex-wrap: wrap; justify-content: center">
+					<div v-for="id in pageIds" v-if="tmp[layer].upgrades[id] !== undefined && tmp[layer].upgrades[id].unlocked" class="upgAlign">
+						<upgrade :layer="layer" :data="id" v-bind:style="tmp[layer].componentStyles.upgrade"></upgrade>
+					</div>
+				</div>
+				<div>
+					<button class="upg" style="min-width: 40px" v-on:click="setPage(0)">|&lt;</button>
+					<button class="upg" style="min-width: 40px" v-on:click="setPage(currentPage - 10)">-10</button>
+					<button class="upg" style="min-width: 40px" v-on:click="setPage(currentPage - 1)">&lt;</button>
+					<span> Page {{currentPage + 1}} / {{pageCount}} </span>
+					<button class="upg" style="min-width: 40px" v-on:click="setPage(currentPage + 1)">&gt;</button>
+					<button class="upg" style="min-width: 40px" v-on:click="setPage(currentPage + 10)">+10</button>
+					<button class="upg" style="min-width: 40px" v-on:click="setPage(pageCount - 1)">&gt;|</button>
+				</div>
+			</template>
 			<br>
 		</div>
 		`

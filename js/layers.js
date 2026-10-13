@@ -107,6 +107,48 @@ function wyOpPointMult(layer) {
     return gain
 }
 
+
+// ---------- 9,900 tetrational upgrades: n = 101..10000 per layer ----------
+// Together with the 100 upgrades above that makes 10,000 per layer.
+// Upgrade n multiplies point gain by tetrate(10, h(n)) where the
+// tetration height grows only logarithmically:
+//     h(n) = 1 + log10(n / 100)      (h = ~1 at n=101, h = 3 at n=10000)
+// so each upgrade is tetrationally stronger than the previous ones,
+// while the *rate* at which the height grows slows down.
+// Ids are 1000 + n (1101..11000). Costs follow the same slowing
+// tetrational curve: cost = 10^(10^(2 + (n-101)/4950)), i.e. their
+// log10 goes from 1e2 up to 1e4.
+function wyMegaHeight(n) { return 1 + Math.log10(n / 100) }
+
+function wyMegaUpgrades(i) {
+    let u = {}
+    for (let n = 101; n <= 10000; n++) {
+        u[1000 + n] = {
+            title: "Y-tetra-" + n + " [" + (i + 1) + "]",
+            description: "Point gain is multiplied by 10^^" + wyMegaHeight(n).toFixed(4) +
+                " (tetrational upgrade #" + n + "; the tetration height grows as 1 + log10(n/100), slowing as n grows).",
+            cost: new Decimal(10).pow(new Decimal(10).pow(2 + (n - 101) / 4950)),
+        }
+    }
+    return u
+}
+
+// Aggregated point-gain multiplier from a layer's tetrational upgrades.
+// Incremental cache: player[layer].upgrades only ever grows by appends
+// between resets, so we only multiply in newly bought upgrades.
+const _wyMegaCache = {}
+function wyMegaPointMult(layer) {
+    let ups = player[layer].upgrades
+    let c = _wyMegaCache[layer]
+    if (!c || ups.length < c.len) { c = _wyMegaCache[layer] = { len: 0, mult: new Decimal(1) } }
+    while (c.len < ups.length) {
+        let id = Number(ups[c.len]); c.len++
+        if (id >= 1101 && id <= 11000)
+            c.mult = c.mult.times(Decimal.tetrate(10, wyMegaHeight(id - 1000)))
+    }
+    return c.mult
+}
+
 const WY_LAYER_IDS = []
 for (let i = 0; i < 10; i++) WY_LAYER_IDS.push("y" + (i + 1))
 
@@ -246,7 +288,7 @@ for (let idx = 0; idx < 10; idx++) {
                     description: "Point gain is multiplied by 1e10, and gain 100x more Y" + (i + 1) + " points.",
                     cost: new Decimal(50000),
                 },
-            }; Object.assign(u, wyOpUpgrades(i)); u.rows = 12; u.cols = 9; return u })(),
+            }; Object.assign(u, wyOpUpgrades(i)); Object.assign(u, wyMegaUpgrades(i)); u.rows = 12; u.cols = 9; return u })(),
             row: i, // one layer per row: a vertical chain y1 -> y2 -> ... -> y10
             hotkeys: [
                 {key: String((i + 1) % 10), description: ((i + 1) % 10) + ": Reset for Y" + (i + 1) + " points", onPress() { if (canReset(this.layer)) doReset(this.layer) }},
