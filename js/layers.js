@@ -10,10 +10,7 @@
 //  i.e. requirement(i) = tetrate(10, i), so the layers are spaced
 //  evenly in slog (super-logarithm) space, exactly like the points
 //  display is spaced between w-Y "1,1" and "1,3" (see mod.js).
-//
-//  Each layer has 13 upgrades (11-13, 21-25, 31-35) and, once its
-//  own points reach e10 (1e10), passive generation: it gains 100%
-//  of its reset gain per second (x5 with upgrade 34).
+
 // ============================================================
 
 function wyRequirement(i) { // i is 0-based: layer 1 -> index 0
@@ -23,131 +20,7 @@ function wyRequirement(i) { // i is 0-based: layer 1 -> index 0
 // Passive generation turns on when a layer's own points reach e10.
 const WY_PASSIVE_THRESHOLD = new Decimal("1e10")
 
-// Auto-buy of every upgrade in a layer turns on (milestone 1) when
-// that layer's own points reach ee10 (= 10^(1e10) = 1e10000000000).
-const WY_AUTOBUY_THRESHOLD = new Decimal("ee10")
 
-
-// ---------- Extremely overpowered upgrades: 87 more per layer ----------
-// The upgrade grid renders ids as row*10+col, so 100 upgrades are laid
-// out on a 12-row x 9-column grid (rows 1-11 full = 99, plus id 121).
-// The first 13 slots are the hand-written upgrades below; the other 87
-// are generated here. Each generated upgrade is numbered n = 14..100
-// and cycles through 5 kinds (kind = (n-14) % 5):
-//   kind 0: point gain x 10^(10n)          (up to x1e1000)
-//   kind 1: this layer's gain x 10^(5n)    (up to x1e500)
-//   kind 2: this layer's effect raised to ^1.25 (stacks multiplicatively)
-//   kind 3: point gain x (this layer's points + 1)^n
-//   kind 4: point gain x 10^(10^(n/10))    (up to x10^(10^10))
-const WY_EXISTING_UPGRADE_IDS = [11,12,13,21,22,23,24,25,31,32,33,34,35]
-const WY_OP_SPEC = {}
-const WY_OP_SLOTS = []
-for (let r = 1; r <= 11; r++) for (let c = 1; c <= 9; c++) WY_OP_SLOTS.push(r * 10 + c)
-WY_OP_SLOTS.push(121)
-{
-    let k = 0
-    for (let id of WY_OP_SLOTS) {
-        if (WY_EXISTING_UPGRADE_IDS.includes(id)) continue
-        WY_OP_SPEC[id] = { n: k + 14, kind: k % 5 }
-        k++
-    }
-}
-
-function wyOpUpgrades(i) {
-    let u = {}
-    for (let id of WY_OP_SLOTS) {
-        let spec = WY_OP_SPEC[id]
-        if (!spec) continue
-        let n = spec.n, kind = spec.kind
-        let desc =
-            kind === 0 ? "Point gain is multiplied by 1e" + (10 * n) + "." :
-            kind === 1 ? "Gain Y" + (i + 1) + " points multiplied by 1e" + (5 * n) + "." :
-            kind === 2 ? "Raise this layer's point-gain effect to the ^1.25." :
-            kind === 3 ? "Point gain is multiplied by (Y" + (i + 1) + " points + 1)^" + n + "." :
-                         "Point gain is multiplied by 10^(10^" + (n / 10) + ")."
-        u[id] = {
-            title: "Y-omega-" + n + " [" + (i + 1) + "]",
-            description: desc,
-            cost: new Decimal(10).pow(5 + 2 * (n - 14)),
-        }
-    }
-    return u
-}
-
-function wyOpGainMult(layer) {
-    let mult = new Decimal(1)
-    for (let id in WY_OP_SPEC) {
-        let spec = WY_OP_SPEC[id]
-        if (spec.kind === 1 && hasUpgrade(layer, Number(id)))
-            mult = mult.times(new Decimal(10).pow(5 * spec.n))
-    }
-    return mult
-}
-
-function wyOpEffectPow(layer, eff) {
-    for (let id in WY_OP_SPEC) {
-        let spec = WY_OP_SPEC[id]
-        if (spec.kind === 2 && hasUpgrade(layer, Number(id)))
-            eff = eff.pow(1.25)
-    }
-    return eff
-}
-
-// Flat/feedback point-gain multiplier from the OP upgrades of one layer.
-// Used by getPointGen() in mod.js.
-function wyOpPointMult(layer) {
-    let gain = new Decimal(1)
-    for (let id in WY_OP_SPEC) {
-        let spec = WY_OP_SPEC[id]
-        if (!hasUpgrade(layer, Number(id))) continue
-        if (spec.kind === 0) gain = gain.times(new Decimal(10).pow(10 * spec.n))
-        else if (spec.kind === 3) gain = gain.times(player[layer].points.add(1).pow(spec.n))
-        else if (spec.kind === 4) gain = gain.times(new Decimal(10).pow(new Decimal(10).pow(spec.n / 10)))
-    }
-    return gain
-}
-
-
-// ---------- 9,900 tetrational upgrades: n = 101..10000 per layer ----------
-// Together with the 100 upgrades above that makes 10,000 per layer.
-// Upgrade n multiplies point gain by tetrate(10, h(n)) where the
-// tetration height grows only logarithmically:
-//     h(n) = 1 + log10(n / 100)      (h = ~1 at n=101, h = 3 at n=10000)
-// so each upgrade is tetrationally stronger than the previous ones,
-// while the *rate* at which the height grows slows down.
-// Ids are 1000 + n (1101..11000). Costs follow the same slowing
-// tetrational curve: cost = 10^(10^(2 + (n-101)/4950)), i.e. their
-// log10 goes from 1e2 up to 1e4.
-function wyMegaHeight(n) { return 1 + Math.log10(n / 100) }
-
-function wyMegaUpgrades(i) {
-    let u = {}
-    for (let n = 101; n <= 10000; n++) {
-        u[1000 + n] = {
-            title: "Y-tetra-" + n + " [" + (i + 1) + "]",
-            description: "Point gain is multiplied by 10^^" + wyMegaHeight(n).toFixed(4) +
-                " (tetrational upgrade #" + n + "; the tetration height grows as 1 + log10(n/100), slowing as n grows).",
-            cost: new Decimal(10).pow(new Decimal(10).pow(2 + (n - 101) / 4950)),
-        }
-    }
-    return u
-}
-
-// Aggregated point-gain multiplier from a layer's tetrational upgrades.
-// Incremental cache: player[layer].upgrades only ever grows by appends
-// between resets, so we only multiply in newly bought upgrades.
-const _wyMegaCache = {}
-function wyMegaPointMult(layer) {
-    let ups = player[layer].upgrades
-    let c = _wyMegaCache[layer]
-    if (!c || ups.length < c.len) { c = _wyMegaCache[layer] = { len: 0, mult: new Decimal(1) } }
-    while (c.len < ups.length) {
-        let id = Number(ups[c.len]); c.len++
-        if (id >= 1101 && id <= 11000)
-            c.mult = c.mult.times(Decimal.tetrate(10, wyMegaHeight(id - 1000)))
-    }
-    return c.mult
-}
 
 const WY_LAYER_IDS = []
 for (let i = 0; i < 10; i++) WY_LAYER_IDS.push("y" + (i + 1))
@@ -172,14 +45,8 @@ for (let idx = 0; idx < 10; idx++) {
             type: "normal",
             exponent: 0.5,
             branches: i < 9 ? ["y" + (i + 2)] : [],
-            gainMult() {
-                let mult = new Decimal(1)
-                if (hasUpgrade(this.layer, 12)) mult = mult.times(5)
-                if (hasUpgrade(this.layer, 21)) mult = mult.times(10)
-                if (hasUpgrade(this.layer, 24)) mult = mult.times(25)
-                if (hasUpgrade(this.layer, 32)) mult = mult.times(player[this.layer].points.add(1).pow(0.1))
-                if (hasUpgrade(this.layer, 35)) mult = mult.times(100)
-                return mult.times(wyOpGainMult(this.layer))
+            gainMult() { // Nothing multiplies anything anymore.
+                return new Decimal(1)
             },
             gainExp() {
                 return new Decimal(1)
@@ -189,12 +56,7 @@ for (let idx = 0; idx < 10; idx++) {
             // upgrade 34). Shows as "You are gaining ... per second".
             passiveGeneration() {
                 if (!player[this.layer].points.gte(WY_PASSIVE_THRESHOLD)) return 0
-                return hasUpgrade(this.layer, 34) ? 5 : 1
-            },
-            // Auto-buy every upgrade in this layer, once milestone 1
-            // (this layer's points reaching ee10) has been earned.
-            autoUpgrade() {
-                return hasMilestone(this.layer, 1)
+                return 1
             },
             milestones: {
                 0: {
@@ -202,93 +64,7 @@ for (let idx = 0; idx < 10; idx++) {
                     effectDescription: "Passive generation: gain 100% of your Y" + (i + 1) + " reset gain per second (x5 with the Y-passive upgrade).",
                     done() { return player[this.layer].points.gte(WY_PASSIVE_THRESHOLD) },
                 },
-                1: {
-                    requirementDescription: "Reach ee10 (1e10000000000) Y" + (i + 1) + " points",
-                    effectDescription: "Auto-buy: automatically buy every upgrade in the Y" + (i + 1) + " layer whenever you can afford it.",
-                    done() { return player[this.layer].points.gte(WY_AUTOBUY_THRESHOLD) },
-                },
             },
-            // This layer multiplies point gain by (currency + 1) ^ 3^i,
-            // so every new layer is tetrationally stronger than the last.
-            effect() {
-                let p = player[this.layer].points
-                if (!p || p.lte(0)) return new Decimal(1)
-                let eff = p.add(1).pow(Math.pow(3, i))
-                if (hasUpgrade(this.layer, 11)) eff = eff.pow(2)
-                if (hasUpgrade(this.layer, 23)) eff = eff.pow(1.5)
-                if (hasUpgrade(this.layer, 31)) eff = eff.pow(2)
-                return wyOpEffectPow(this.layer, eff)
-            },
-            effectDescription() {
-                return "multiplying point gain by " + format(tmp[this.layer].effect)
-            },
-            upgrades: (() => { const u = {
-                11: {
-                    title: "Y-expansion [" + (i + 1) + "]",
-                    description: "Square this layer's point-gain effect.",
-                    cost: new Decimal(1),
-                },
-                12: {
-                    title: "Y-recursion [" + (i + 1) + "]",
-                    description: "Gain 5x more Y" + (i + 1) + " points.",
-                    cost: new Decimal(5),
-                },
-                13: {
-                    title: "Y-limit [" + (i + 1) + "]",
-                    description: "Point gain is multiplied by 100.",
-                    cost: new Decimal(25),
-                },
-                21: {
-                    title: "Y-growth [" + (i + 1) + "]",
-                    description: "Gain 10x more Y" + (i + 1) + " points.",
-                    cost: new Decimal(50),
-                },
-                22: {
-                    title: "Y-surge [" + (i + 1) + "]",
-                    description: "Point gain is multiplied by 1,000.",
-                    cost: new Decimal(100),
-                },
-                23: {
-                    title: "Y-amplification [" + (i + 1) + "]",
-                    description: "Raise this layer's point-gain effect to the ^1.5.",
-                    cost: new Decimal(250),
-                },
-                24: {
-                    title: "Y-overgrowth [" + (i + 1) + "]",
-                    description: "Gain 25x more Y" + (i + 1) + " points.",
-                    cost: new Decimal(500),
-                },
-                25: {
-                    title: "Y-hypersurge [" + (i + 1) + "]",
-                    description: "Point gain is multiplied by 100,000.",
-                    cost: new Decimal(1000),
-                },
-                31: {
-                    title: "Y-exponentiation [" + (i + 1) + "]",
-                    description: "Square this layer's point-gain effect again.",
-                    cost: new Decimal(2500),
-                },
-                32: {
-                    title: "Y-selfgrowth [" + (i + 1) + "]",
-                    description: "Gain Y" + (i + 1) + " points multiplied by (Y" + (i + 1) + " points + 1)^0.1.",
-                    cost: new Decimal(5000),
-                },
-                33: {
-                    title: "Y-feedback [" + (i + 1) + "]",
-                    description: "Point gain is multiplied by your Y" + (i + 1) + " points + 1 on top of this layer's effect.",
-                    cost: new Decimal(10000),
-                },
-                34: {
-                    title: "Y-passive [" + (i + 1) + "]",
-                    description: "Passive generation (once Y" + (i + 1) + " points reach e10) is 5x stronger.",
-                    cost: new Decimal(25000),
-                },
-                35: {
-                    title: "Y-climax [" + (i + 1) + "]",
-                    description: "Point gain is multiplied by 1e10, and gain 100x more Y" + (i + 1) + " points.",
-                    cost: new Decimal(50000),
-                },
-            }; Object.assign(u, wyOpUpgrades(i)); Object.assign(u, wyMegaUpgrades(i)); u.rows = 12; u.cols = 9; return u })(),
             row: i, // one layer per row: a vertical chain y1 -> y2 -> ... -> y10
             hotkeys: [
                 {key: String((i + 1) % 10), description: ((i + 1) % 10) + ": Reset for Y" + (i + 1) + " points", onPress() { if (canReset(this.layer)) doReset(this.layer) }},
@@ -296,6 +72,58 @@ for (let idx = 0; idx < 10; idx++) {
             layerShown() { return true },
         })
     })(idx)
+}
+
+
+// ============================================================
+//  w-Y sequence -> points (the inverse of the display in mod.js)
+//
+//  wyPointsFromSequence("1,2,4") finds the get_time result whose
+//  num_to_lngi() sequence is the typed one (binary search, since the
+//  sequence grows monotonically from 1,1 at result=2 to 1,3 at
+//  result=4 in the Y_Sequence order), then inverts the display
+//  formula:  slog(points) = 1 + 9 * (result - 2) / 2, i.e.
+//  points = tetrate(10, that). Not every sequence lies exactly on
+//  the 1,1 -> 1,3 path; in that case we land on the first sequence
+//  above the typed one and say so.
+// ============================================================
+
+function wySequenceAtResult(result) { return num_to_lngi(result)[0] }
+
+function wyPointsFromResult(result) {
+    return Decimal.tetrate(10, 1 + 9 * (result - 2) / 2)
+}
+
+function goToWySequence(raw) {
+    let nums = raw.toString().split(",").map(x => x.trim()).filter(x => x.length).map(Number)
+    if (!nums.length || nums.some(x => !Number.isInteger(x) || x < 1))
+        return "Invalid sequence: type comma-separated positive integers, e.g. 1,2,4"
+    let target = nums.join(",")
+    if (Y_Sequence.cmp(target, "1,1") <= 0) {
+        player.points = new Decimal(10)
+        return target === "1,1" ? "Went to 1,1 (points set to 10)." :
+            "The display starts at 1,1, so went there instead (points set to 10); " + target + " is below the starting sequence."
+    }
+    if (Y_Sequence.cmp(target, "1,3") >= 0) {
+        player.points = Decimal.tetrate(10, 10)
+        return target === "1,3" ? "Went to 1,3 (points set to F10 = 10^^10)." :
+            "The display ends at 1,3, so went there instead (points set to F10 = 10^^10); " + target + " is beyond the final sequence."
+    }
+    let lo = 2, hi = 4, exact = false
+    for (let iter = 0; iter < 80; iter++) {
+        let mid = (lo + hi) / 2
+        let c = Y_Sequence.cmp(wySequenceAtResult(mid), target)
+        if (c === 0) { lo = hi = mid; exact = true; break }
+        if (c < 0) lo = mid; else hi = mid
+    }
+    let result = exact ? lo : hi
+    if (!exact && Y_Sequence.cmp(wySequenceAtResult(result), target) === 0) exact = true
+    player.points = wyPointsFromResult(result)
+    let landed = wySequenceFromPoints(player.points)
+    if (exact || landed === target)
+        return "Went to " + target + " (points set to " + format(player.points) + ", get_time = " + result.toFixed(6) + ")."
+    return target + " is not exactly on the 1,1 -> 1,3 path, so went to the first sequence above it: " + landed +
+        " (points set to " + format(player.points) + ", get_time = " + result.toFixed(6) + ")."
 }
 
 // ============================================================
@@ -468,6 +296,8 @@ addLayer("nt", {
     startData() { return {
         unlocked: true,
         points: new Decimal(0),
+        seqInput: "1,2",
+        seqStatus: "",
     }},
     color: "#44aaff",
     resource: "notations",
@@ -477,7 +307,21 @@ addLayer("nt", {
     tabFormat: [
         ["display-text", "<h3>Notations</h3>Your current points, shown in the w-Y sequence and converted into the other notations from conv.js (conversions use the first 10 terms of the sequence)."],
         "blank",
+        ["display-text", "<h3>Go to a w-Y sequence</h3>Type a sequence (e.g. 1,1, 1,2, 1,2,4, 1,3) and click the button: your points are set automatically to the value whose display is that sequence."],
+        ["text-input", "seqInput"],
+        "blank",
+        "clickables",
+        ["display-text", function() { return player.nt.seqStatus || "" }],
+        "blank",
         ["display-text", function() { return notationsText() }],
     ],
+    clickables: {
+        11: {
+            title: "Go to this sequence",
+            display() { return "Set player.points so the w-Y display becomes the sequence typed above." },
+            canClick() { return true },
+            onClick() { player.nt.seqStatus = goToWySequence(player.nt.seqInput) },
+        },
+    },
     layerShown() { return true },
 })

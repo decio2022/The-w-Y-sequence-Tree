@@ -12,7 +12,7 @@ let modInfo = {
 
 // Set your version in num and name
 let VERSION = {
-	num: "1.5",
+	num: "1.6",
 	name: "w-Y sequence",
 }
 
@@ -34,7 +34,10 @@ let changelog = `<h1>Changelog:</h1><br>
 		- Added 9,900 tetrational upgrades per layer: now 10,000 upgrades per layer (100,000 in all). Each multiplies point gain by 10^^(1 + log10(n/100)), so they get tetrationally stronger while the tetration height's growth slows.<br>
 		- Revamped the upgrades display: upgrades are now shown 100 per page, with page navigation.<br>
 	<h3>v1.5</h3><br>
-		- Bought upgrades are now hidden from the screen (and pagination only counts unbought upgrades), to reduce lag.`
+		- Bought upgrades are now hidden from the screen (and pagination only counts unbought upgrades), to reduce lag.<br>
+	<h3>v1.6</h3><br>
+		- Removed all upgrades. Point gain is always 1 per second and nothing increases it.<br>
+		- The Notations layer now has a sequence input: type a w-Y sequence and go to it automatically, updating your points value.`
 
 let winText = `Congratulations! You reached F10 (10^^10) points, reset for Y10, and your points display reached w-Y 1,3. You have beaten this game, but for now...`
 
@@ -51,36 +54,12 @@ function canGenPoints(){
 	return true
 }
 
-// Calculate points/sec!
+// Calculate points/sec! Nothing increases it: it is always 1/sec.
 function getPointGen() {
 	if(!canGenPoints())
 		return new Decimal(0)
 
-	let gain = new Decimal(1)
-	// Every unlocked w-Y layer multiplies point gain by its effect,
-	// plus the flat / feedback point-gain upgrades of that layer:
-	//   13: x100   22: x1,000   25: x100,000   35: x1e10
-	//   33: x (that layer's points + 1)
-	if (typeof WY_LAYER_IDS !== "undefined") {
-		for (let id of WY_LAYER_IDS) {
-			if (player[id] && player[id].unlocked && tmp[id] && tmp[id].effect)
-				gain = gain.times(tmp[id].effect)
-			// Extremely overpowered generated upgrades (kinds 0, 3, 4)
-			if (player[id] && typeof wyOpPointMult !== "undefined")
-				gain = gain.times(wyOpPointMult(id))
-			// Tetrational upgrades n=101..10000 (aggregated, cached)
-			if (player[id] && player[id].upgrades && typeof wyMegaPointMult !== "undefined")
-				gain = gain.times(wyMegaPointMult(id))
-			if (typeof hasUpgrade !== "undefined" && player[id]) {
-				if (hasUpgrade(id, 13)) gain = gain.times(100)
-				if (hasUpgrade(id, 22)) gain = gain.times(1000)
-				if (hasUpgrade(id, 25)) gain = gain.times(100000)
-				if (hasUpgrade(id, 33)) gain = gain.times(player[id].points.add(1))
-				if (hasUpgrade(id, 35)) gain = gain.times("1e10")
-			}
-		}
-	}
-	return gain
+	return new Decimal(1)
 }
 
 function get_time(t) {
@@ -191,7 +170,7 @@ function wySequenceFromPoints(points) {
     // num_to_lngi (via ntl + Y_Sequence.fs) is comparatively expensive
     // and the displayed sequence only changes slowly, so cache it on
     // the (quantised) result of get_time.
-    let key = result.toFixed(4)
+    let key = result.toFixed(6)
     if (key !== _wyCacheKey) {
         _wyCacheKey = key
         try { _wyCacheSeq = num_to_lngi(result)[0] } catch (e) { /* keep last sequence */ }
