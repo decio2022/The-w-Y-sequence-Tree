@@ -12,7 +12,7 @@ let modInfo = {
 
 // Set your version in num and name
 let VERSION = {
-	num: "1.0",
+	num: "1.1",
 	name: "w-Y sequence",
 }
 
@@ -20,7 +20,10 @@ let changelog = `<h1>Changelog:</h1><br>
 	<h3>v1.0</h3><br>
 		- Added 10 w-Y layers: Layer 1 unlocks at 10 points, Layer 10 at F10 (10^^10) points.<br>
 		- The points display now shows the w-Y sequence: it starts at 1,1 and reaches 1,3 at F10 points.<br>
-		- Each layer has 3 upgrades and multiplies point gain tetrationally more than the previous one.`
+		- Each layer has 3 upgrades and multiplies point gain tetrationally more than the previous one.<br>
+	<h3>v1.1</h3><br>
+		- Added 10 more upgrades per layer (13 total per layer, 130 in all).<br>
+		- Added passive generation: a layer passively gains 100% of its reset gain per second once its own points reach e10 (1e10), or 500% per second with its Y-passive upgrade.`
 
 let winText = `Congratulations! You reached F10 (10^^10) points, reset for Y10, and your points display reached w-Y 1,3. You have beaten this game, but for now...`
 
@@ -43,14 +46,21 @@ function getPointGen() {
 		return new Decimal(0)
 
 	let gain = new Decimal(1)
-	// Every unlocked w-Y layer multiplies point gain by its effect
-	// (and by another x100 if its "Y-limit" upgrade is bought).
+	// Every unlocked w-Y layer multiplies point gain by its effect,
+	// plus the flat / feedback point-gain upgrades of that layer:
+	//   13: x100   22: x1,000   25: x100,000   35: x1e10
+	//   33: x (that layer's points + 1)
 	if (typeof WY_LAYER_IDS !== "undefined") {
 		for (let id of WY_LAYER_IDS) {
 			if (player[id] && player[id].unlocked && tmp[id] && tmp[id].effect)
 				gain = gain.times(tmp[id].effect)
-			if (typeof hasUpgrade !== "undefined" && player[id] && hasUpgrade(id, 13))
-				gain = gain.times(100)
+			if (typeof hasUpgrade !== "undefined" && player[id]) {
+				if (hasUpgrade(id, 13)) gain = gain.times(100)
+				if (hasUpgrade(id, 22)) gain = gain.times(1000)
+				if (hasUpgrade(id, 25)) gain = gain.times(100000)
+				if (hasUpgrade(id, 33)) gain = gain.times(player[id].points.add(1))
+				if (hasUpgrade(id, 35)) gain = gain.times("1e10")
+			}
 		}
 	}
 	return gain
