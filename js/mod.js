@@ -12,7 +12,7 @@ let modInfo = {
 
 // Set your version in num and name
 let VERSION = {
-	num: "1.4",
+	num: "1.5",
 	name: "w-Y sequence",
 }
 
@@ -32,7 +32,9 @@ let changelog = `<h1>Changelog:</h1><br>
 		- Added a milestone to every layer: at ee10 of that layer's points it auto-buys every upgrade in its own layer.<br>
 	<h3>v1.4</h3><br>
 		- Added 9,900 tetrational upgrades per layer: now 10,000 upgrades per layer (100,000 in all). Each multiplies point gain by 10^^(1 + log10(n/100)), so they get tetrationally stronger while the tetration height's growth slows.<br>
-		- Revamped the upgrades display: upgrades are now shown 100 per page, with page navigation.`
+		- Revamped the upgrades display: upgrades are now shown 100 per page, with page navigation.<br>
+	<h3>v1.5</h3><br>
+		- Bought upgrades are now hidden from the screen (and pagination only counts unbought upgrades), to reduce lag.`
 
 let winText = `Congratulations! You reached F10 (10^^10) points, reset for Y10, and your points display reached w-Y 1,3. You have beaten this game, but for now...`
 

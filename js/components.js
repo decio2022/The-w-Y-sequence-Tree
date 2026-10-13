@@ -164,9 +164,18 @@ function loadVue() {
 			allIds() {
 				return Object.keys(layers[this.layer].upgrades).filter(k => !isNaN(k)).map(Number).sort((a, b) => a - b)
 			},
-			pageCount() { return Math.max(1, Math.ceil(this.allIds.length / 100)) },
+			// Bought upgrades are hidden from the screen (this is the
+			// main lag saver: far fewer buttons to render/update).
+			// Pagination runs over the unbought upgrades only, so each
+			// page still shows a full 100 unbought upgrades.
+			visibleIds() {
+				let bought = new Set(player[this.layer].upgrades.map(x => toNumber(x)))
+				return this.allIds.filter(id => !bought.has(id))
+			},
+			boughtCount() { return this.allIds.length - this.visibleIds.length },
+			pageCount() { return Math.max(1, Math.ceil(this.visibleIds.length / 100)) },
 			currentPage() { return Math.min(this.page, this.pageCount - 1) },
-			pageIds() { return this.allIds.slice(this.currentPage * 100, this.currentPage * 100 + 100) },
+			pageIds() { return this.visibleIds.slice(this.currentPage * 100, this.currentPage * 100 + 100) },
 		},
 		methods: {
 			setPage(p) { this.page = Math.max(0, Math.min(p, this.pageCount - 1)) },
@@ -185,12 +194,13 @@ function loadVue() {
 					<button class="upg" style="min-width: 40px" v-on:click="setPage(0)">|&lt;</button>
 					<button class="upg" style="min-width: 40px" v-on:click="setPage(currentPage - 10)">-10</button>
 					<button class="upg" style="min-width: 40px" v-on:click="setPage(currentPage - 1)">&lt;</button>
-					<span> Page {{currentPage + 1}} / {{pageCount}} &mdash; upgrades {{currentPage * 100 + 1}}&ndash;{{Math.min(currentPage * 100 + 100, allIds.length)}} of {{allIds.length}} (100 per page) </span>
+					<span> Page {{currentPage + 1}} / {{pageCount}} &mdash; upgrades {{visibleIds.length ? currentPage * 100 + 1 : 0}}&ndash;{{Math.min(currentPage * 100 + 100, visibleIds.length)}} of {{visibleIds.length}} unbought (100 per page, {{boughtCount}} bought hidden of {{allIds.length}} total) </span>
 					<button class="upg" style="min-width: 40px" v-on:click="setPage(currentPage + 1)">&gt;</button>
 					<button class="upg" style="min-width: 40px" v-on:click="setPage(currentPage + 10)">+10</button>
 					<button class="upg" style="min-width: 40px" v-on:click="setPage(pageCount - 1)">&gt;|</button>
 				</div>
 				<br>
+				<div v-if="!visibleIds.length">All {{allIds.length}} upgrades bought! (bought upgrades are hidden)</div>
 				<div style="display: flex; flex-wrap: wrap; justify-content: center">
 					<div v-for="id in pageIds" v-if="tmp[layer].upgrades[id] !== undefined && tmp[layer].upgrades[id].unlocked" class="upgAlign">
 						<upgrade :layer="layer" :data="id" v-bind:style="tmp[layer].componentStyles.upgrade"></upgrade>
@@ -215,7 +225,7 @@ function loadVue() {
 	Vue.component('upgrade', {
 		props: ['layer', 'data'],
 		template: `
-		<button v-if="tmp[layer].upgrades && tmp[layer].upgrades[data]!== undefined && tmp[layer].upgrades[data].unlocked" :id='"upgrade-" + layer + "-" + data' v-on:click="buyUpg(layer, data)" v-bind:class="{ [layer]: true, tooltipBox: true, upg: true, bought: hasUpgrade(layer, data), locked: (!(canAffordUpgrade(layer, data))&&!hasUpgrade(layer, data)), can: (canAffordUpgrade(layer, data)&&!hasUpgrade(layer, data))}"
+		<button v-if="tmp[layer].upgrades && tmp[layer].upgrades[data]!== undefined && tmp[layer].upgrades[data].unlocked && !hasUpgrade(layer, data)" :id='"upgrade-" + layer + "-" + data' v-on:click="buyUpg(layer, data)" v-bind:class="{ [layer]: true, tooltipBox: true, upg: true, bought: hasUpgrade(layer, data), locked: (!(canAffordUpgrade(layer, data))&&!hasUpgrade(layer, data)), can: (canAffordUpgrade(layer, data)&&!hasUpgrade(layer, data))}"
 			v-bind:style="[((!hasUpgrade(layer, data) && canAffordUpgrade(layer, data)) ? {'background-color': tmp[layer].color} : {}), tmp[layer].upgrades[data].style]">
 			<span v-if="layers[layer].upgrades[data].fullDisplay" v-html="run(layers[layer].upgrades[data].fullDisplay, layers[layer].upgrades[data])"></span>
 			<span v-else>
