@@ -12,7 +12,7 @@ let modInfo = {
 
 // Set your version in num and name
 let VERSION = {
-	num: "1.2",
+	num: "1.3",
 	name: "w-Y sequence",
 }
 
@@ -27,7 +27,9 @@ let changelog = `<h1>Changelog:</h1><br>
 	<h3>v1.2</h3><br>
 		- Added 87 extremely overpowered upgrades per layer: now 100 upgrades per layer (1,000 in all).<br>
 		- Added a Dev side layer: type a value for player.points, jump to landmarks, and see the w-Y sequence, get_time and estimated time to each sequence.<br>
-		- Added a Notations side layer showing your points in the other notations from conv.js (BMS, DBMS, PMS, AMS, 0Y, Vulcaniz, cOCF, EcOCF).`
+		- Added a Notations side layer showing your points in the other notations from conv.js (BMS, DBMS, PMS, AMS, 0Y, Vulcaniz, cOCF, EcOCF).<br>
+	<h3>v1.3</h3><br>
+		- Added a milestone to every layer: at ee10 of that layer's points it auto-buys every upgrade in its own layer.`
 
 let winText = `Congratulations! You reached F10 (10^^10) points, reset for Y10, and your points display reached w-Y 1,3. You have beaten this game, but for now...`
 

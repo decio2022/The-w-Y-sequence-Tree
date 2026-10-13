@@ -23,6 +23,10 @@ function wyRequirement(i) { // i is 0-based: layer 1 -> index 0
 // Passive generation turns on when a layer's own points reach e10.
 const WY_PASSIVE_THRESHOLD = new Decimal("1e10")
 
+// Auto-buy of every upgrade in a layer turns on (milestone 1) when
+// that layer's own points reach ee10 (= 10^(1e10) = 1e10000000000).
+const WY_AUTOBUY_THRESHOLD = new Decimal("ee10")
+
 
 // ---------- Extremely overpowered upgrades: 87 more per layer ----------
 // The upgrade grid renders ids as row*10+col, so 100 upgrades are laid
@@ -145,11 +149,21 @@ for (let idx = 0; idx < 10; idx++) {
                 if (!player[this.layer].points.gte(WY_PASSIVE_THRESHOLD)) return 0
                 return hasUpgrade(this.layer, 34) ? 5 : 1
             },
+            // Auto-buy every upgrade in this layer, once milestone 1
+            // (this layer's points reaching ee10) has been earned.
+            autoUpgrade() {
+                return hasMilestone(this.layer, 1)
+            },
             milestones: {
                 0: {
                     requirementDescription: "Reach e10 (1e10) Y" + (i + 1) + " points",
                     effectDescription: "Passive generation: gain 100% of your Y" + (i + 1) + " reset gain per second (x5 with the Y-passive upgrade).",
                     done() { return player[this.layer].points.gte(WY_PASSIVE_THRESHOLD) },
+                },
+                1: {
+                    requirementDescription: "Reach ee10 (1e10000000000) Y" + (i + 1) + " points",
+                    effectDescription: "Auto-buy: automatically buy every upgrade in the Y" + (i + 1) + " layer whenever you can afford it.",
+                    done() { return player[this.layer].points.gte(WY_AUTOBUY_THRESHOLD) },
                 },
             },
             // This layer multiplies point gain by (currency + 1) ^ 3^i,
